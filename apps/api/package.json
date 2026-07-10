@@ -1,0 +1,31 @@
+{
+  "name": "live-check-in-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prebuild": "cd ../.. && npm run build --workspace packages/shared",
+    "build": "tsc -p tsconfig.json",
+    "dev": "npm run build && node --watch dist/main.js",
+    "start": "node dist/main.js",
+    "pretest": "cd ../.. && npm run build --workspace packages/shared",
+    "test": "vitest run",
+    "pretypecheck": "cd ../.. && npm run build --workspace packages/shared",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@live-check-in-demo/shared": "file:../../packages/shared",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "pino": "^9.7.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.21",
+    "@types/supertest": "^6.0.3",
+    "supertest": "^7.1.1",
+    "vitest": "^3.2.4"
+  }
+}
