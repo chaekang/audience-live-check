@@ -1,0 +1,24 @@
+{
+  "name": "live-check-in-demo",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace packages/shared && concurrently --kill-others-on-fail \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "npm run dev --workspace apps/web",
+    "dev:api": "npm run build --workspace packages/shared && npm run build --workspace apps/api && npm run start --workspace apps/api",
+    "build": "npm run build --workspace packages/shared && npm run build --workspace apps/api && npm run build --workspace apps/web",
+    "test": "npm run build --workspace packages/shared && npm run test --workspace apps/api && npm run test --workspace apps/web",
+    "typecheck": "npm run build --workspace packages/shared && npm run typecheck --workspace packages/shared && npm run typecheck --workspace apps/api && npm run typecheck --workspace apps/web",
+    "lint": "biome check .",
+    "start:api": "npm run start --workspace apps/api"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
+  }
+}
