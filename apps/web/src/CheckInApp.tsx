@@ -3,7 +3,7 @@ import { useCheckIn } from "./use-check-in";
 import "./styles.css";
 
 export function CheckInApp(): ReactElement {
-  const { status, message, start } = useCheckIn();
+  const { status, message, servedBy, start } = useCheckIn();
   const isButtonDisabled =
     status === "starting" || status === "active" || status === "completed";
   const statusLabel =
@@ -17,7 +17,13 @@ export function CheckInApp(): ReactElement {
 
   return (
     <main className="page-shell">
-      <section className="check-in-panel" aria-labelledby="service-title">
+      <section
+        className="check-in-panel"
+        aria-labelledby="service-title"
+        data-served-by={
+          import.meta.env.DEV ? (servedBy ?? undefined) : undefined
+        }
+      >
         <p className="eyebrow">LIVE CHECK-IN</p>
         <h1 id="service-title">발표 데모에 참여해 주세요.</h1>
         <p className="privacy-note">별도의 개인정보는 저장하지 않습니다.</p>

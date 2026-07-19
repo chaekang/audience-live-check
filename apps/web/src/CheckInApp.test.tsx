@@ -17,7 +17,7 @@ function session(
   expiresAt = new Date(Date.now() + 60_000).toISOString(),
 ): CheckInResponse {
   return {
-    sessionId: "00000000-0000-4000-8000-000000000001",
+    sessionToken: "payload.signature",
     expiresAt,
     heartbeatIntervalMs: 3_000,
   };
@@ -58,8 +58,84 @@ describe("CheckInApp", () => {
 
     expect(mockedCreateCheckIn).toHaveBeenCalledTimes(1);
     expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
+    expect(mockedSendHeartbeat).toHaveBeenCalledWith(
+      "payload.signature",
+      expect.any(AbortSignal),
+    );
     expect(screen.getByText("✓ 참여 중 · 연결됨")).toBeInTheDocument();
     expect(button).toBeDisabled();
+  });
+
+  it("waits for each heartbeat before scheduling the next one", async () => {
+    vi.useFakeTimers();
+    let resolveFirst: (
+      value: Awaited<ReturnType<typeof sendHeartbeat>>,
+    ) => void = () => undefined;
+    mockedCreateCheckIn.mockResolvedValue(session());
+    mockedSendHeartbeat
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockResolvedValue({
+        ok: true,
+        receivedAt: new Date().toISOString(),
+        servedBy: "task-b",
+      });
+    render(<CheckInApp />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "참여하기" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFirst({
+        ok: true,
+        receivedAt: new Date().toISOString(),
+        servedBy: "task-a",
+      });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_999);
+    });
+    expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(mockedSendHeartbeat).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains the latest servedBy value as development metadata", async () => {
+    mockedCreateCheckIn.mockResolvedValue(session());
+    mockedSendHeartbeat.mockResolvedValue({
+      ok: true,
+      receivedAt: new Date().toISOString(),
+      servedBy: "task-b",
+    });
+    render(<CheckInApp />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "참여하기" }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      screen
+        .getByRole("heading", { name: "발표 데모에 참여해 주세요." })
+        .closest("section"),
+    ).toHaveAttribute("data-served-by", "task-b");
   });
 
   it("moves to completed after the session expires", async () => {
@@ -103,7 +179,7 @@ describe("CheckInApp", () => {
   it("aborts an in-flight heartbeat on unmount", async () => {
     let heartbeatSignal: AbortSignal | undefined;
     mockedCreateCheckIn.mockResolvedValue(session());
-    mockedSendHeartbeat.mockImplementation((_sessionId, signal) => {
+    mockedSendHeartbeat.mockImplementation((_sessionToken, signal) => {
       heartbeatSignal = signal;
       return new Promise(() => undefined);
     });
