@@ -125,6 +125,27 @@ npm test
 
 ### `POST /api/check-ins`
 
+### `POST /api/traffic`
+
+본문과 사용자 데이터를 저장하지 않고 `204 No Content`를 반환하는 관측용 traffic probe입니다.
+SketchCatch Live Observation collector가 배포된 CloudFront/ALB/ECS 경로에 실제 요청을 한 번 더 전달할 때 사용합니다.
+
+### SketchCatch 실시간 관측 신호
+
+SketchCatch가 발급한 청중 참여 URL에는 다음 query parameter가 포함될 수 있습니다.
+
+```text
+sketchcatch_observation_url=https://<sketchcatch-origin>/api/live-observations/public/<observation-id>
+```
+
+frontend는 실제 check-in 또는 heartbeat 요청이 성공한 뒤에만 이 주소로 best-effort 관측 신호를
+보냅니다. 먼저 `/bootstrap`에서 짧은 수명의 capability를 받고, 이후 `/receipts`에 무작위
+event ID를 전송합니다. capability는 query string이나 localStorage에 저장하지 않습니다.
+
+관측 신호 전송이 실패해도 청중의 check-in과 heartbeat 흐름은 계속됩니다. 따라서 SketchCatch
+화면은 Store receipt로 요청 급증을 약 1초 안에 표시할 수 있고, CloudWatch ALB 지표는 AWS의
+기본 발행 주기에 따라 뒤늦게 보강 증거로 표시됩니다.
+
 개인정보 없이 HMAC-SHA256으로 서명한 opaque session token, 만료 시각, heartbeat 간격을 반환합니다. 무작위 UUID session ID는 token payload 안에만 들어가며 URL에는 노출되지 않습니다.
 
 ```json

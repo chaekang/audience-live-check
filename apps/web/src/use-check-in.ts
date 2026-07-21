@@ -7,6 +7,10 @@ import {
   type StoredSession,
   saveStoredSession,
 } from "./check-in-storage";
+import {
+  createObservationSignalClient,
+  type ObservationSignalClient,
+} from "./observation-signal-client";
 
 const MAX_HEARTBEAT_RETRIES = 2;
 const RETRY_DELAY_MS = 1_000;
@@ -35,6 +39,7 @@ export function useCheckIn(): CheckInState & { readonly start: () => void } {
   const controllerRef = useRef<AbortController | null>(null);
   const lastServedByRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  const observationSignalRef = useRef<ObservationSignalClient | null>(null);
 
   const updateState = useCallback((next: CheckInState): void => {
     if (mountedRef.current) {
@@ -77,6 +82,7 @@ export function useCheckIn(): CheckInState & { readonly start: () => void } {
             session.sessionToken,
             controller.signal,
           );
+          void observationSignalRef.current?.recordSuccessfulRequest();
           lastServedByRef.current = heartbeat.servedBy;
           updateState({
             status: "active",
@@ -143,6 +149,7 @@ export function useCheckIn(): CheckInState & { readonly start: () => void } {
       if (controller.signal.aborted || !mountedRef.current) {
         return;
       }
+      void observationSignalRef.current?.recordSuccessfulRequest();
       saveStoredSession(session);
       lastServedByRef.current = null;
       updateState({
@@ -198,6 +205,18 @@ export function useCheckIn(): CheckInState & { readonly start: () => void } {
         });
       });
   }, [beginSession, updateState]);
+
+  useEffect(() => {
+    const client = createObservationSignalClient();
+    observationSignalRef.current = client;
+
+    return () => {
+      client?.dispose();
+      if (observationSignalRef.current === client) {
+        observationSignalRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;

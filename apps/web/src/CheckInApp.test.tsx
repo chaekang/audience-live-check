@@ -1,17 +1,26 @@
 import type { CheckInResponse } from "@live-check-in-demo/shared";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCheckIn, sendHeartbeat } from "./api-client";
 import { CheckInApp } from "./CheckInApp";
+import { createObservationSignalClient } from "./observation-signal-client";
 
 vi.mock("./api-client", () => ({
   createCheckIn: vi.fn(),
   sendHeartbeat: vi.fn(),
 }));
+vi.mock("./observation-signal-client", () => ({
+  createObservationSignalClient: vi.fn(),
+}));
 
 const mockedCreateCheckIn = vi.mocked(createCheckIn);
 const mockedSendHeartbeat = vi.mocked(sendHeartbeat);
+const mockedCreateObservationSignalClient = vi.mocked(
+  createObservationSignalClient,
+);
+const recordSuccessfulRequest = vi.fn(async () => true);
+const disposeObservationSignal = vi.fn();
 
 function session(
   expiresAt = new Date(Date.now() + 60_000).toISOString(),
@@ -22,6 +31,13 @@ function session(
     heartbeatIntervalMs: 3_000,
   };
 }
+
+beforeEach(() => {
+  mockedCreateObservationSignalClient.mockReturnValue({
+    dispose: disposeObservationSignal,
+    recordSuccessfulRequest,
+  });
+});
 
 afterEach(() => {
   window.localStorage.clear();
@@ -37,6 +53,27 @@ describe("CheckInApp", () => {
       screen.getByRole("heading", { name: "발표 데모에 참여해 주세요." }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "참여하기" })).toBeEnabled();
+  });
+
+  it("records successful check-in and heartbeat traffic for live observation", async () => {
+    mockedCreateCheckIn.mockResolvedValue(session());
+    mockedSendHeartbeat.mockResolvedValue({
+      ok: true,
+      receivedAt: new Date().toISOString(),
+      servedBy: "task-a",
+    });
+    render(<CheckInApp />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockedCreateCheckIn).toHaveBeenCalledTimes(1);
+    expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
+    expect(recordSuccessfulRequest).toHaveBeenCalledTimes(2);
   });
 
   it("starts a fresh session for each request and cancels the previous heartbeat", async () => {
