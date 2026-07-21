@@ -69,6 +69,13 @@ function createLogCapture(): {
 }
 
 describe("check-in API", () => {
+  it("accepts a traffic probe without storing participant data", async () => {
+    const response = await request(createTestApp()).post("/api/traffic");
+
+    expect(response.status).toBe(204);
+    expect(response.text).toBe("");
+  });
+
   it("returns the health contract", async () => {
     const response = await request(createTestApp()).get("/health");
 
