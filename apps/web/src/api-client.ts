@@ -7,7 +7,18 @@ import {
 import ky from "ky";
 
 const configuredBaseUrl = import.meta.env["VITE_API_BASE_URL"];
-const apiBaseUrl = configuredBaseUrl ?? "http://localhost:8080";
+const apiBaseUrl = resolveApiBaseUrl(configuredBaseUrl);
+
+function resolveApiBaseUrl(configuredValue: string | undefined): string {
+  const value = configuredValue?.trim() || "http://localhost:8080";
+  if (!value.startsWith("/")) {
+    return value;
+  }
+  if (typeof location === "undefined") {
+    throw new Error("A relative API base URL requires a browser origin.");
+  }
+  return new URL(value, location.origin).toString();
+}
 
 export type ApiClient = {
   readonly createCheckIn: (signal: AbortSignal) => Promise<CheckInResponse>;
