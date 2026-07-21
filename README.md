@@ -10,8 +10,6 @@
 4. 버튼은 즉시 비활성화되고 `참여 중 · 연결됨` 상태가 표시됩니다.
 5. 60초가 지나면 요청을 중단하고 `참여 완료` 상태를 표시합니다.
 
-session token과 만료 시각은 새로고침 복구를 위해 브라우저의 localStorage에 임시로 보관하고 만료 즉시 삭제합니다. token payload에는 무작위 session ID, 발급 시각, 만료 시각만 있으며 개인정보, IP, User-Agent는 포함하지 않습니다. API는 session 상태를 저장하지 않으며 데이터베이스와 Redis도 사용하지 않습니다.
-
 ## 폴더 구조
 
 ```text
@@ -39,6 +37,31 @@ live-check-in-demo/
 ├── README.md
 └── tsconfig.base.json
 ```
+
+## Architecture Overview
+![architecture overview](image-1.png)
+
+## Stateless API Container
+
+`apps/api`는 체크인 요청과 heartbeat를 처리하는 독립 HTTP API입니다. Dockerfile, 환경 변수 기반 설정, health endpoint를 갖추고 있어 컨테이너 실행 환경에 맞춰 구성되어 있습니다.
+
+![API container](image-2.png)
+
+### 요청 증가에 대응하는 구조
+- 체크인 API는 서버 메모리에 세션을 저장하지 않습니다. apps/api/src/session-token.ts는 session ID, 발급 시각, 만료 시각을 포함한 HMAC-SHA256 서명 token을 발급합니다.
+- heartbeat 요청은 token을 Authorization: Bearer 헤더로 전달합니다. 각 API 컨테이너는 같은 CHECK_IN_SIGNING_SECRET을 사용하면 자신이 발급하지 않은 token도 검증할 수 있습니다.
+- 따라서 특정 API 프로세스에 세션 상태가 묶이지 않습니다. 요청량이 증가할 때 여러 컨테이너가 같은 방식으로 체크인과 heartbeat를 처리할 수 있습니다.
+- INSTANCE_ID는 heartbeat 응답의 servedBy에 포함됩니다. 개발 환경에서는 어떤 API 인스턴스가 요청을 처리했는지 확인할 수 있습니다.
+- 웹 앱은 session token을 브라우저 localStorage에 만료 시점까지만 임시 저장하고, API는 이를 영속 저장하지 않습니다.
+
+### Docker Runtime
+- apps/api/Dockerfile은 API와 packages/shared를 multi-stage build로 빌드한 뒤, production dependency와 빌드 결과만 포함한 Node 22 Alpine 이미지를 만듭니다.
+- 컨테이너는 비루트 node 사용자로 실행됩니다.
+- 기본 포트는 8080이며, PORT 환경 변수로 변경할 수 있습니다.
+- GET /health endpoint와 Docker HEALTHCHECK가 준비되어 있습니다.
+- WEB_ORIGIN, INSTANCE_ID, CHECK_IN_SIGNING_SECRET은 이미지에 고정하지 않고 실행 시 환경 변수로 전달합니다.
+
+이 API는 컨테이너 단위로 실행할 수 있고 서버 간 공유 세션 저장소를 요구하지 않으므로, ECS Fargate와 같은 container runtime에서 여러 API task를 운영하는 구조와 잘 맞습니다. 다만 실제 task 수, 자동 확장 기준, 네트워크 구성, 외부 health check 구성은 이 저장소에 정의되어 있지 않습니다.
 
 ## Application Units
 
@@ -164,39 +187,3 @@ curl http://localhost:8080/health
 ```
 
 이미지는 production dependency만 포함하고 `node` non-root 사용자로 실행합니다. `EXPOSE 8080`과 container health check는 `/health`를 사용합니다.
-
-## 배포 계약
-
-frontend와 backend는 독립된 Application Unit입니다. `apps/web`은 Vite 정적 build 결과를 S3/CloudFront에 배포하고, `apps/api`는 Docker image를 ECS/Fargate Service로 실행할 수 있습니다. API 앞의 ALB는 `/health`를 Target Group health check로 사용합니다.
-
-API는 공유 상태가 없는 서명 token을 사용합니다. Task A에서 발급한 token도 같은 `CHECK_IN_SIGNING_SECRET`을 사용하는 Task B 또는 C가 독립적으로 검증할 수 있으므로 Fargate가 1개에서 최대 3개로 확장되어도 ALB sticky session, Redis, 데이터베이스가 필요하지 않습니다. production에서는 AWS Secrets Manager 같은 비밀 저장소를 통해 모든 Task에 정확히 같은 secret을 주입해야 합니다. 서로 다른 secret을 쓰는 Task는 의도적으로 서로의 token을 거절합니다.
-
-이 샘플은 애플리케이션 소스만 제공하며 Terraform이나 실제 AWS 리소스 정의는 포함하지 않습니다. 운영 환경에서는 ALB에서 TLS를 종료하고 `WEB_ORIGIN`, `VITE_API_BASE_URL`에 HTTPS origin을 사용하세요. 이 token은 60초짜리 데모 참여 확인용이며 사용자 인증 token이 아닙니다. 공개 서비스 수준의 인증이나 rate limiting이 필요하면 별도 설계가 필요합니다.
-
-## SketchCatch 데모 배포 기준
-
-이 저장소는 SketchCatch의 재현 가능한 golden-path 데모용 기준 레포입니다. Repository 분석과 템플릿 추천은 아래 계약을 정답으로 사용해야 합니다.
-
-### 기대 분석 결과
-
-- apps/web: React + TypeScript + Vite 정적 웹 애플리케이션
-- apps/api: Express + Node.js + TypeScript 컨테이너 API
-- API Dockerfile: apps/api/Dockerfile
-- API 포트와 ALB health check: 8080, /health
-- API 경로: /api
-- frontend build output: apps/web/dist
-- deployment configuration (web build + API runtime): VITE_API_BASE_URL, WEB_ORIGIN, PORT, INSTANCE_ID, CHECK_IN_SIGNING_SECRET
-
-### 목표 AWS 배포 구조
-
-apps/web은 S3와 CloudFront로 정적 배포합니다. apps/api는 Docker image를 ECR에 push한 뒤 ECS/Fargate Service로 실행합니다. ALB는 API의 /health를 Target Group health check로 사용하고, CloudWatch는 ECS와 ALB의 운영 지표와 로그를 수집합니다.
-
-`VITE_API_BASE_URL`은 ALB의 HTTPS API origin을 가리키고, `WEB_ORIGIN`은 CloudFront의 HTTPS origin을 허용합니다. `PORT`는 컨테이너 포트와 맞추고, `INSTANCE_ID`는 각 Task를 구분할 값으로 설정합니다. `CHECK_IN_SIGNING_SECRET`은 Secrets Manager 등에서 가져온 동일한 값을 모든 Task에 주입합니다. 발표용 기본값은 API Fargate Task 1개이며, 최대 3개로 확장해도 sticky session이나 공유 session 저장소 없이 heartbeat가 계속됩니다.
-
-버튼 한 번은 최초 token 발급 요청 1회와 약 60초 동안 3초 간격의 순차 heartbeat 약 20회를 만듭니다. heartbeat 응답의 `servedBy`로 다른 Task가 같은 token을 검증하는지 확인할 수 있고, 이 요청은 ALB 요청 수와 CloudWatch 로그·지표를 관측하는 데 사용할 수 있습니다.
-
-### GitOps 데모 기준
-
-main branch의 변경은 GitHub Actions가 Docker build, ECR push, 새 ECS Task Definition 등록, ECS Service 배포, ALB health check 순서로 반영합니다. 발표에서는 UI 문구 또는 버전 표기 한 줄만 바꿔 v2 배포를 검증합니다.
-
-이 계약은 SketchCatch 데모를 위한 우선 배포 기준이며, 이 README의 일반적인 EC2/ASG 예시는 이 데모 경로에 적용하지 않습니다.
