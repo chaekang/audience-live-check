@@ -82,7 +82,7 @@ describe("check-in API", () => {
   });
 
   it("issues an opaque signed token without exposing the session ID", async () => {
-    const response = await request(createTestApp()).post("/api/check-ins");
+    const response = await request(createTestApp()).post("/api/participations");
 
     expect(response.status).toBe(201);
     expect(response.body).not.toHaveProperty("sessionId");

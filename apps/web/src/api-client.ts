@@ -31,14 +31,14 @@ export function createApiClient(
   return {
     async createCheckIn(signal): Promise<CheckInResponse> {
       const payload: unknown = await api
-        .post("api/check-ins", { signal })
+        .post("api/participations", { signal })
         .json();
       return checkInResponseSchema.parse(payload);
     },
 
     async sendHeartbeat(sessionToken, signal): Promise<HeartbeatResponse> {
       const payload: unknown = await api
-        .post("api/check-ins/heartbeat", {
+        .post("api/participations/heartbeat", {
           signal,
           headers: { authorization: `Bearer ${sessionToken}` },
         })

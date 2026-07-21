@@ -45,6 +45,12 @@ describe("API client", () => {
     await expect(
       client.createCheckIn(requestCompatibleSignal()),
     ).resolves.toEqual(checkInResponse);
+
+    expect(fetchImplementation).toHaveBeenCalledTimes(1);
+    const call = fetchImplementation.mock.calls[0];
+    expect(call).toBeDefined();
+    const request = toRequest(call?.[0] ?? "", call?.[1]);
+    expect(request.url).toBe("http://localhost:8080/api/participations");
   });
 
   it("sends the token only in the heartbeat Authorization header", async () => {
@@ -65,7 +71,7 @@ describe("API client", () => {
     const call = fetchImplementation.mock.calls[0];
     expect(call).toBeDefined();
     const request = toRequest(call?.[0] ?? "", call?.[1]);
-    expect(request.url).toBe("http://localhost:8080/api/check-ins/heartbeat");
+    expect(request.url).toBe("http://localhost:8080/api/participations/heartbeat");
     expect(request.headers.get("authorization")).toBe(
       `Bearer ${checkInResponse.sessionToken}`,
     );
