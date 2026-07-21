@@ -170,6 +170,12 @@ Content-Type: application/json
 
 기존 배포 검증기와의 호환성을 위해 `/api/check-ins`와 `/api/check-ins/heartbeat`도 동일한 handler의 alias로 유지합니다. 브라우저 frontend는 `/api/participations` 경로를 사용합니다.
 
+### SketchCatch Live Observation 연동
+
+SketchCatch가 audience URL에 `sketchcatch_observation_url` query parameter를 전달하면 frontend는 HTTPS URL과 `/api/live-observations/public/<uuid>` 경로를 검증한 뒤 `/bootstrap`에서 단기 credential을 받습니다. credential은 메모리에만 유지합니다.
+
+실제 check-in 또는 heartbeat가 성공한 뒤에만 고유 event ID를 `/receipts`로 전송합니다. 이 전송은 best-effort이므로 SketchCatch Live Observation이 일시적으로 사용할 수 없어도 참여와 heartbeat 성공에는 영향을 주지 않습니다.
+
 유효한 token이면 `ok`, `receivedAt`, `servedBy`를 반환합니다. `servedBy`는 `INSTANCE_ID` 또는 hostname이므로 개발 환경에서 요청을 처리한 Task를 확인할 수 있습니다. Authorization 누락, 서명 불일치, 변조, 만료 token은 동일한 JSON 형식의 `401 invalid_session`으로 거절합니다.
 
 존재하지 않는 route는 일관된 JSON `404`, 잘못된 JSON은 `400`, 처리되지 않은 서버 오류는 일관된 JSON `500`으로 응답합니다. CORS는 `Authorization`과 `Content-Type`을 허용하고 요청 body 제한은 `16kb`입니다. 애플리케이션 요청 로그에는 method와 status만 기록하며 token, secret, IP, User-Agent와 원문 오류 메시지는 기록하지 않습니다. ALB나 WAF 같은 인프라 access log의 보존 정책은 배포 환경에서 별도로 관리해야 합니다.
