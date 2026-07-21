@@ -146,7 +146,7 @@ npm test
 }
 ```
 
-### `POST /api/check-ins`
+### `POST /api/participations`
 
 개인정보 없이 HMAC-SHA256으로 서명한 opaque session token, 만료 시각, heartbeat 간격을 반환합니다. 무작위 UUID session ID는 token payload 안에만 들어가며 URL에는 노출되지 않습니다.
 
@@ -158,15 +158,17 @@ npm test
 }
 ```
 
-### `POST /api/check-ins/heartbeat`
+### `POST /api/participations/heartbeat`
 
 token은 URL path나 query가 아니라 Bearer Authorization 헤더로 전달합니다.
 
 ```http
-POST /api/check-ins/heartbeat HTTP/1.1
+POST /api/participations/heartbeat HTTP/1.1
 Authorization: Bearer <sessionToken>
 Content-Type: application/json
 ```
+
+기존 배포 검증기와의 호환성을 위해 `/api/check-ins`와 `/api/check-ins/heartbeat`도 동일한 handler의 alias로 유지합니다. 브라우저 frontend는 `/api/participations` 경로를 사용합니다.
 
 유효한 token이면 `ok`, `receivedAt`, `servedBy`를 반환합니다. `servedBy`는 `INSTANCE_ID` 또는 hostname이므로 개발 환경에서 요청을 처리한 Task를 확인할 수 있습니다. Authorization 누락, 서명 불일치, 변조, 만료 token은 동일한 JSON 형식의 `401 invalid_session`으로 거절합니다.
 

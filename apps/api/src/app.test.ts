@@ -95,9 +95,9 @@ describe("check-in API", () => {
 
   it("accepts a valid Bearer heartbeat", async () => {
     const app = createTestApp({ instanceId: "task-a" });
-    const checkIn = await request(app).post("/api/check-ins");
+    const checkIn = await request(app).post("/api/participations");
     const heartbeat = await request(app)
-      .post("/api/check-ins/heartbeat")
+      .post("/api/participations/heartbeat")
       .set("Authorization", bearer(String(checkIn.body.sessionToken)));
 
     expect(heartbeat.status).toBe(200);

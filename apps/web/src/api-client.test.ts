@@ -35,6 +35,29 @@ function requestCompatibleSignal(): AbortSignal {
 }
 
 describe("API client", () => {
+  it("binds the browser native fetch receiver", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = function (
+      this: typeof globalThis,
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ): Promise<Response> {
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return Promise.resolve(jsonResponse(checkInResponse));
+    } as typeof fetch;
+
+    try {
+      const client = createApiClient();
+      await expect(
+        client.createCheckIn(requestCompatibleSignal()),
+      ).resolves.toEqual(checkInResponse);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   it("parses a signed-token check-in response", async () => {
     const fetchImplementation = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>

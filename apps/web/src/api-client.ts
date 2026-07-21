@@ -18,7 +18,7 @@ export type ApiClient = {
 };
 
 export function createApiClient(
-  fetchImplementation: typeof globalThis.fetch = globalThis.fetch,
+  fetchImplementation: typeof globalThis.fetch = globalThis.fetch.bind(globalThis),
 ): ApiClient {
   const api = ky.create({
     prefixUrl: apiBaseUrl.replace(/\/$/, ""),
