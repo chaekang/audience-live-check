@@ -40,3 +40,22 @@ it("defaults production builds to the deployed site origin", async () => {
 
   expect(resolveApiBaseUrl(undefined, true)).toBe("https://audience.example/");
 });
+
+it("keeps the browser fetch receiver when no implementation is injected", async () => {
+  vi.stubEnv("VITE_API_BASE_URL", "/");
+  vi.stubGlobal("location", new URL("https://audience.example/"));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(function (this: typeof globalThis) {
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return Promise.resolve(Response.json(checkInResponse));
+    }),
+  );
+  const { createApiClient } = await import("./api-client");
+
+  await expect(
+    createApiClient().createCheckIn(new Request("http://localhost").signal),
+  ).resolves.toEqual(checkInResponse);
+});
