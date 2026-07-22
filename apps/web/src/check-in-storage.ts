@@ -3,6 +3,7 @@ import { z } from "zod";
 const STORAGE_KEY = "live-check-in-session";
 
 const memoryEntries = new Map<string, string>();
+const memoryTombstones = new Set<string>();
 const memoryStorage: Storage = {
   get length(): number {
     return memoryEntries.size;
@@ -32,20 +33,87 @@ const storedSessionSchema = z.object({
 
 export type StoredSession = z.infer<typeof storedSessionSchema>;
 
-function getStorage(): Storage {
+function getLocalStorage(): Storage | null {
   try {
-    return window.localStorage ?? memoryStorage;
+    return window.localStorage ?? null;
   } catch (error) {
     if (error instanceof DOMException) {
-      return memoryStorage;
+      return null;
+    }
+    throw error;
+  }
+}
+
+function readStorageValue(key: string): string | null {
+  const memoryValue = memoryStorage.getItem(key);
+  if (memoryValue !== null) {
+    return memoryValue;
+  }
+  if (memoryTombstones.has(key)) {
+    return null;
+  }
+
+  const storage = getLocalStorage();
+  if (storage === null) {
+    memoryTombstones.add(key);
+    return null;
+  }
+
+  try {
+    return storage.getItem(key);
+  } catch (error) {
+    if (error instanceof DOMException) {
+      memoryTombstones.add(key);
+      return null;
+    }
+    throw error;
+  }
+}
+
+function writeStorageValue(key: string, value: string): void {
+  const storage = getLocalStorage();
+  if (storage === null) {
+    memoryStorage.setItem(key, value);
+    memoryTombstones.delete(key);
+    return;
+  }
+
+  try {
+    storage.setItem(key, value);
+    memoryStorage.removeItem(key);
+    memoryTombstones.delete(key);
+  } catch (error) {
+    if (error instanceof DOMException) {
+      memoryStorage.setItem(key, value);
+      memoryTombstones.delete(key);
+      return;
+    }
+    throw error;
+  }
+}
+
+function removeStorageValue(key: string): void {
+  memoryStorage.removeItem(key);
+  const storage = getLocalStorage();
+  if (storage === null) {
+    memoryTombstones.add(key);
+    return;
+  }
+
+  try {
+    storage.removeItem(key);
+    memoryTombstones.delete(key);
+  } catch (error) {
+    if (error instanceof DOMException) {
+      memoryTombstones.add(key);
+      return;
     }
     throw error;
   }
 }
 
 export function readStoredSession(now = Date.now()): StoredSession | null {
-  const storage = getStorage();
-  const raw = storage.getItem(STORAGE_KEY);
+  const raw = readStorageValue(STORAGE_KEY);
   if (raw === null) {
     return null;
   }
@@ -55,7 +123,7 @@ export function readStoredSession(now = Date.now()): StoredSession | null {
     candidate = JSON.parse(raw);
   } catch (error) {
     if (error instanceof SyntaxError) {
-      storage.removeItem(STORAGE_KEY);
+      removeStorageValue(STORAGE_KEY);
       return null;
     }
     throw error;
@@ -63,7 +131,7 @@ export function readStoredSession(now = Date.now()): StoredSession | null {
 
   const parsed = storedSessionSchema.safeParse(candidate);
   if (!parsed.success || Date.parse(parsed.data.expiresAt) <= now) {
-    storage.removeItem(STORAGE_KEY);
+    removeStorageValue(STORAGE_KEY);
     return null;
   }
 
@@ -71,9 +139,9 @@ export function readStoredSession(now = Date.now()): StoredSession | null {
 }
 
 export function saveStoredSession(session: StoredSession): void {
-  getStorage().setItem(STORAGE_KEY, JSON.stringify(session));
+  writeStorageValue(STORAGE_KEY, JSON.stringify(session));
 }
 
 export function clearStoredSession(): void {
-  getStorage().removeItem(STORAGE_KEY);
+  removeStorageValue(STORAGE_KEY);
 }

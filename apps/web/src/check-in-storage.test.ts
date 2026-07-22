@@ -17,10 +17,52 @@ const originalStorageDescriptor = Object.getOwnPropertyDescriptor(
   "localStorage",
 );
 
+function installStorageThatThrows(
+  operation: "getItem" | "setItem" | "removeItem",
+  initialEntries: Readonly<Record<string, string>> = {},
+): void {
+  const entries = new Map(Object.entries(initialEntries));
+  const storage: Storage = {
+    get length(): number {
+      return entries.size;
+    },
+    clear(): void {
+      entries.clear();
+    },
+    getItem(key: string): string | null {
+      if (operation === "getItem") {
+        throw new DOMException("Storage access is blocked", "SecurityError");
+      }
+      return entries.get(key) ?? null;
+    },
+    key(index: number): string | null {
+      return Array.from(entries.keys())[index] ?? null;
+    },
+    removeItem(key: string): void {
+      if (operation === "removeItem") {
+        throw new DOMException("Storage access is blocked", "SecurityError");
+      }
+      entries.delete(key);
+    },
+    setItem(key: string, value: string): void {
+      if (operation === "setItem") {
+        throw new DOMException("Storage quota exceeded", "QuotaExceededError");
+      }
+      entries.set(key, value);
+    },
+  };
+
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    value: storage,
+  });
+}
+
 afterEach(() => {
   if (originalStorageDescriptor !== undefined) {
     Object.defineProperty(window, "localStorage", originalStorageDescriptor);
   }
+  clearStoredSession();
   window.localStorage.clear();
 });
 
@@ -66,6 +108,39 @@ describe("check-in session storage", () => {
     expect(readStoredSession(0)).toEqual(session);
 
     clearStoredSession();
+    expect(readStoredSession(0)).toBeNull();
+  });
+
+  it("keeps a session in memory when localStorage rejects a write", () => {
+    installStorageThatThrows("setItem");
+
+    expect(() => saveStoredSession(session)).not.toThrow();
+    expect(readStoredSession(0)).toEqual(session);
+  });
+
+  it("treats a blocked localStorage read as an empty in-memory store", () => {
+    installStorageThatThrows("getItem");
+
+    expect(() => readStoredSession(0)).not.toThrow();
+    expect(readStoredSession(0)).toBeNull();
+  });
+
+  it("ignores a blocked localStorage removal", () => {
+    installStorageThatThrows("removeItem", {
+      "live-check-in-session": "not-json",
+    });
+
+    expect(() => readStoredSession(0)).not.toThrow();
+    expect(readStoredSession(0)).toBeNull();
+  });
+
+  it("does not restore a cleared session when localStorage rejects removal", () => {
+    installStorageThatThrows("removeItem", {
+      "live-check-in-session": JSON.stringify(session),
+    });
+
+    clearStoredSession();
+
     expect(readStoredSession(0)).toBeNull();
   });
 });
