@@ -20,6 +20,7 @@ const originalStorageDescriptor = Object.getOwnPropertyDescriptor(
 function installStorageThatThrows(
   operation: "getItem" | "setItem" | "removeItem",
   initialEntries: Readonly<Record<string, string>> = {},
+  error: Error = new DOMException("Storage access is blocked", "SecurityError"),
 ): void {
   const entries = new Map(Object.entries(initialEntries));
   const storage: Storage = {
@@ -31,7 +32,7 @@ function installStorageThatThrows(
     },
     getItem(key: string): string | null {
       if (operation === "getItem") {
-        throw new DOMException("Storage access is blocked", "SecurityError");
+        throw error;
       }
       return entries.get(key) ?? null;
     },
@@ -40,13 +41,13 @@ function installStorageThatThrows(
     },
     removeItem(key: string): void {
       if (operation === "removeItem") {
-        throw new DOMException("Storage access is blocked", "SecurityError");
+        throw error;
       }
       entries.delete(key);
     },
     setItem(key: string, value: string): void {
       if (operation === "setItem") {
-        throw new DOMException("Storage quota exceeded", "QuotaExceededError");
+        throw error;
       }
       entries.set(key, value);
     },
@@ -113,6 +114,13 @@ describe("check-in session storage", () => {
 
   it("keeps a session in memory when localStorage rejects a write", () => {
     installStorageThatThrows("setItem");
+
+    expect(() => saveStoredSession(session)).not.toThrow();
+    expect(readStoredSession(0)).toEqual(session);
+  });
+
+  it("keeps a session in memory when the browser wraps a storage failure", () => {
+    installStorageThatThrows("setItem", {}, new Error("Storage unavailable"));
 
     expect(() => saveStoredSession(session)).not.toThrow();
     expect(readStoredSession(0)).toEqual(session);

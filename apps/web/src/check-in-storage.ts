@@ -36,11 +36,8 @@ export type StoredSession = z.infer<typeof storedSessionSchema>;
 function getLocalStorage(): Storage | null {
   try {
     return window.localStorage ?? null;
-  } catch (error) {
-    if (error instanceof DOMException) {
-      return null;
-    }
-    throw error;
+  } catch {
+    return null;
   }
 }
 
@@ -61,12 +58,9 @@ function readStorageValue(key: string): string | null {
 
   try {
     return storage.getItem(key);
-  } catch (error) {
-    if (error instanceof DOMException) {
-      memoryTombstones.add(key);
-      return null;
-    }
-    throw error;
+  } catch {
+    memoryTombstones.add(key);
+    return null;
   }
 }
 
@@ -82,13 +76,9 @@ function writeStorageValue(key: string, value: string): void {
     storage.setItem(key, value);
     memoryStorage.removeItem(key);
     memoryTombstones.delete(key);
-  } catch (error) {
-    if (error instanceof DOMException) {
-      memoryStorage.setItem(key, value);
-      memoryTombstones.delete(key);
-      return;
-    }
-    throw error;
+  } catch {
+    memoryStorage.setItem(key, value);
+    memoryTombstones.delete(key);
   }
 }
 
@@ -103,12 +93,8 @@ function removeStorageValue(key: string): void {
   try {
     storage.removeItem(key);
     memoryTombstones.delete(key);
-  } catch (error) {
-    if (error instanceof DOMException) {
-      memoryTombstones.add(key);
-      return;
-    }
-    throw error;
+  } catch {
+    memoryTombstones.add(key);
   }
 }
 
