@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 env:
-  SKETCHCATCH_EXPECTED_PROJECT_ID: "7780ea91-4698-44a4-9666-49efae63c019"
+  SKETCHCATCH_EXPECTED_PROJECT_ID: "87e5ecfc-1459-41f5-95dd-47f81bf7c99a"
   SKETCHCATCH_PROJECT_ID: ${{ vars.SKETCHCATCH_PROJECT_ID }}
   SKETCHCATCH_AWS_REGION: ${{ vars.SKETCHCATCH_AWS_REGION }}
   SKETCHCATCH_TF_STATE_BUCKET: ${{ vars.SKETCHCATCH_TF_STATE_BUCKET }}
@@ -21,7 +21,7 @@ jobs:
     environment: sketchcatch-production
     defaults:
       run:
-        working-directory: sketchcatch/test/terraform
+        working-directory: sketchcatch/ddsfasd/terraform
     steps:
       - name: Validate SketchCatch project binding
         shell: bash
@@ -62,7 +62,7 @@ jobs:
         run: |
           aws s3 rm "s3://${{ vars.SKETCHCATCH_RELEASE_BUCKET }}/releases/" --recursive || true
           aws s3 rm "s3://${{ vars.SKETCHCATCH_RELEASE_BUCKET }}/lambda/" --recursive || true
-          aws s3 rm "s3://${{ vars.SKETCHCATCH_RELEASE_BUCKET }}/test/ec2-asg/" --recursive || true
+          aws s3 rm "s3://${{ vars.SKETCHCATCH_RELEASE_BUCKET }}/ddsfasd/ec2-asg/" --recursive || true
           if [ -n "${{ vars.SKETCHCATCH_STATIC_BUCKET }}" ]; then
             aws s3 rm "s3://${{ vars.SKETCHCATCH_STATIC_BUCKET }}/releases/" --recursive || true
           fi
