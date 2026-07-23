@@ -5,9 +5,9 @@ on:
     branches: ["main"]
     paths:
       - "**"
-      - "!sketchcatch/ddsfasd/terraform/**"
-      - "!sketchcatch/ddsfasd/ci-cd/**"
-      - "sketchcatch/ddsfasd/ci-cd/retry.json"
+      - "!sketchcatch/demo/terraform/**"
+      - "!sketchcatch/demo/ci-cd/**"
+      - "sketchcatch/demo/ci-cd/retry.json"
       - '!.github/workflows/sketchcatch-infra.yml'
       - '!.github/workflows/sketchcatch-app.yml'
       - '!.github/workflows/sketchcatch-destroy.yml'
@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 env:
-  SKETCHCATCH_EXPECTED_PROJECT_ID: "87e5ecfc-1459-41f5-95dd-47f81bf7c99a"
+  SKETCHCATCH_EXPECTED_PROJECT_ID: "aed6e41f-5155-47b8-a628-fe48664177f2"
   SKETCHCATCH_PROJECT_ID: ${{ vars.SKETCHCATCH_PROJECT_ID }}
   SKETCHCATCH_RELEASE_API_URL: ${{ vars.SKETCHCATCH_RELEASE_API_URL }}
   SKETCHCATCH_OIDC_AUDIENCE: sketchcatch-release-run
