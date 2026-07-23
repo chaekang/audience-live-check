@@ -114,7 +114,11 @@ jobs:
               exit 1
             }
           else
-            echo 'terraform { backend "s3" {} }' > sketchcatch-backend.tf
+            cat > sketchcatch-backend.tf <<'EOF'
+          terraform {
+            backend "s3" {}
+          }
+          EOF
           fi
           run_with_heartbeat terraform init -backend-config=backend.auto.tfbackend
           send_heartbeat
