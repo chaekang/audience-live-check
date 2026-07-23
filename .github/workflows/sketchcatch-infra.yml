@@ -56,6 +56,23 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         id: terraform
         continue-on-error: true
+      - name: Verify GitHub OIDC claims
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          OIDC_TOKEN=$(curl --fail-with-body --silent --show-error \
+            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | jq -er '.value')
+          OIDC_PAYLOAD=$(printf '%s' "$OIDC_TOKEN" | cut -d. -f2 | tr '_-' '/+')
+          case $((${#OIDC_PAYLOAD} % 4)) in
+            2) OIDC_PAYLOAD="${OIDC_PAYLOAD}==" ;;
+            3) OIDC_PAYLOAD="${OIDC_PAYLOAD}=" ;;
+          esac
+          OIDC_CLAIMS=$(printf '%s' "$OIDC_PAYLOAD" | base64 --decode)
+          printf '%s\n' "$OIDC_CLAIMS" | jq '{iss,aud,sub,repository,environment,ref,workflow,job_workflow_ref}'
+          test "$(printf '%s\n' "$OIDC_CLAIMS" | jq -r '.aud')" = "sts.amazonaws.com"
+          test "$(printf '%s\n' "$OIDC_CLAIMS" | jq -r '.sub')" = "repo:${{ github.repository }}:environment:sketchcatch-production"
       - uses: aws-actions/configure-aws-credentials@v4
         id: aws
         continue-on-error: true
