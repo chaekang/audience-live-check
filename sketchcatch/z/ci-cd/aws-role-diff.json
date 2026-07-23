@@ -1,0 +1,14 @@
+{
+  "roleArn": "arn:aws:iam::316875069960:role/SketchCatchTerraformExecutionRole-02b721f5",
+  "repository": "whiskend/audience-live-check",
+  "targetBranch": "main",
+  "environmentName": "sketchcatch-production",
+  "requiredTrustConditions": {
+    "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+    "token.actions.githubusercontent.com:sub": "repo:whiskend/audience-live-check:environment:sketchcatch-production",
+    "sketchcatch:target_branch": "main"
+  },
+  "approved": false,
+  "approvedByUserId": null,
+  "approvedAt": null
+}

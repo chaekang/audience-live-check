@@ -134,6 +134,10 @@ npm test
 
 전체 build는 shared 타입을 먼저 만들고 API와 frontend를 각각 빌드합니다. API는 `dist/main.js`, frontend는 `apps/web/dist`에 결과를 만듭니다.
 
+## 배포
+
+`main`의 애플리케이션 변경은 SketchCatch CI/CD를 통해 기존 AWS 환경에 배포됩니다.
+
 ## API endpoints
 
 ### `GET /health`

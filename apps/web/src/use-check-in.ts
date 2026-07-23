@@ -232,6 +232,7 @@ export function useCheckIn(): CheckInState & {
         ) {
           return;
         }
+        console.error("Audience check-in failed", error);
         controllerRef.current = null;
         updateState({
           status: "error",

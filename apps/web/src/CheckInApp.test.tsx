@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCheckIn, sendHeartbeat } from "./api-client";
 import { CheckInApp } from "./CheckInApp";
+import { clearStoredSession } from "./check-in-storage";
 import { createObservationSignalClient } from "./observation-signal-client";
 
 vi.mock("./api-client", () => ({
@@ -21,6 +22,10 @@ const mockedCreateObservationSignalClient = vi.mocked(
 );
 const recordSuccessfulRequest = vi.fn(async () => true);
 const disposeObservationSignal = vi.fn();
+const originalStorageDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  "localStorage",
+);
 
 function session(
   expiresAt = new Date(Date.now() + 60_000).toISOString(),
@@ -45,6 +50,10 @@ beforeEach(() => {
 
 afterEach(() => {
   window.history.replaceState(null, "", "/");
+  if (originalStorageDescriptor !== undefined) {
+    Object.defineProperty(window, "localStorage", originalStorageDescriptor);
+  }
+  clearStoredSession();
   window.localStorage.clear();
   vi.clearAllMocks();
   vi.restoreAllMocks();
@@ -170,6 +179,48 @@ describe("CheckInApp", () => {
     expect(mockedCreateCheckIn).toHaveBeenCalledTimes(1);
     expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
     expect(recordSuccessfulRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a successful check-in active when browser storage rejects the session", async () => {
+    const entries = new Map<string, string>();
+    const blockedStorage: Storage = {
+      get length(): number {
+        return entries.size;
+      },
+      clear(): void {
+        entries.clear();
+      },
+      getItem(key: string): string | null {
+        return entries.get(key) ?? null;
+      },
+      key(index: number): string | null {
+        return Array.from(entries.keys())[index] ?? null;
+      },
+      removeItem(key: string): void {
+        entries.delete(key);
+      },
+      setItem(): void {
+        throw new DOMException("Storage quota exceeded", "QuotaExceededError");
+      },
+    };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: blockedStorage,
+    });
+    mockedCreateCheckIn.mockResolvedValue(session());
+    mockedSendHeartbeat.mockImplementation(() => new Promise(() => undefined));
+    render(<CheckInApp />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "참여하기" }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("✓ 참여 중 · 연결됨")).toBeInTheDocument();
+    expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
   });
 
   it("offers an explicit repeat action after check-in starts", async () => {
