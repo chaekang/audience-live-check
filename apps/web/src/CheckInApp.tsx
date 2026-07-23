@@ -24,7 +24,7 @@ export function CheckInApp(): ReactElement {
         }
       >
         <p className="eyebrow">LIVE CHECK-IN</p>
-        <h1 id="service-title">시연에 참여해 주세요!</h1>
+        <h1 id="service-title">시연에 참여해 주세요!!!</h1>
         <button
           className="check-in-button"
           type="button"
