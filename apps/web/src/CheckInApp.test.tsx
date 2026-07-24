@@ -65,7 +65,7 @@ describe("CheckInApp", () => {
     render(<CheckInApp />);
 
     expect(
-      screen.getByRole("heading", { name: "시연에 참여해 주세요!!!" }),
+      screen.getByRole("heading", { name: "데모에 참여해 주세요." }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("별도의 개인정보는 저장하지 않습니다."),
@@ -343,7 +343,7 @@ describe("CheckInApp", () => {
 
     expect(
       screen
-        .getByRole("heading", { name: "시연에 참여해 주세요!!!" })
+        .getByRole("heading", { name: "데모에 참여해 주세요." })
         .closest("section"),
     ).toHaveAttribute("data-served-by", "task-b");
   });

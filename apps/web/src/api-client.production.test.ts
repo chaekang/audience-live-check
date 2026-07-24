@@ -31,7 +31,7 @@ it("uses the deployed site origin when the API base is the site root", async () 
 
   const request = fetchImplementation.mock.calls[0]?.[0];
   expect(request).toBeInstanceOf(Request);
-  expect((request as Request).url).toBe(`${location.origin}/api/participations`);
+  expect((request as Request).url).toBe(`${location.origin}/api/check-ins`);
 });
 
 it("defaults production builds to the deployed site origin", async () => {

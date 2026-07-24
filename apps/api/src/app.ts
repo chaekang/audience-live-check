@@ -49,11 +49,11 @@ export function createApp(options: AppOptions = {}): Express {
     response.json(health);
   });
 
-  app.post(["/api/participations", "/api/check-ins"], (_request, response) => {
+  app.post("/api/check-ins", (_request, response) => {
     response.status(201).json(tokenService.issue());
   });
 
-  app.post(["/api/participations/heartbeat", "/api/check-ins/heartbeat"], (request, response) => {
+  app.post("/api/check-ins/heartbeat", (request, response) => {
     const authorization = request.get("authorization") ?? "";
     const match = bearerTokenPattern.exec(authorization);
     const result =

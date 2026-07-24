@@ -5,7 +5,6 @@ import {
   heartbeatResponseSchema,
 } from "@live-check-in-demo/shared";
 import ky from "ky";
-import { createLiveObservationReceiptReporter } from "./live-observation-receipt";
 
 const configuredBaseUrl = import.meta.env["VITE_API_BASE_URL"];
 const apiBaseUrl = resolveApiBaseUrl(configuredBaseUrl, import.meta.env.PROD);
@@ -33,16 +32,10 @@ export type ApiClient = {
   ) => Promise<HeartbeatResponse>;
 };
 
-export type ApiClientOptions = Readonly<{
-  createEventId?: (() => string) | undefined;
-  locationHref?: string | undefined;
-}>;
-
 export function createApiClient(
   fetchImplementation: typeof globalThis.fetch = globalThis.fetch.bind(
     globalThis,
   ),
-  options: ApiClientOptions = {},
 ): ApiClient {
   const api = ky.create({
     prefixUrl: apiBaseUrl.replace(/\/$/, ""),
@@ -51,36 +44,23 @@ export function createApiClient(
     headers: { "content-type": "application/json" },
     fetch: fetchImplementation,
   });
-  const receiptReporter = createLiveObservationReceiptReporter({
-    createEventId: options.createEventId,
-    fetch: fetchImplementation,
-    locationHref:
-      options.locationHref ??
-      (typeof globalThis.location === "undefined"
-        ? undefined
-        : globalThis.location.href),
-  });
 
   return {
     async createCheckIn(signal): Promise<CheckInResponse> {
       const payload: unknown = await api
-        .post("api/participations", { signal })
+        .post("api/check-ins", { signal })
         .json();
-      const response = checkInResponseSchema.parse(payload);
-      receiptReporter.record();
-      return response;
+      return checkInResponseSchema.parse(payload);
     },
 
     async sendHeartbeat(sessionToken, signal): Promise<HeartbeatResponse> {
       const payload: unknown = await api
-        .post("api/participations/heartbeat", {
+        .post("api/check-ins/heartbeat", {
           signal,
           headers: { authorization: `Bearer ${sessionToken}` },
         })
         .json();
-      const response = heartbeatResponseSchema.parse(payload);
-      receiptReporter.record();
-      return response;
+      return heartbeatResponseSchema.parse(payload);
     },
   };
 }

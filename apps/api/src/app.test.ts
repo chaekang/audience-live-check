@@ -89,7 +89,7 @@ describe("check-in API", () => {
   });
 
   it("issues an opaque signed token without exposing the session ID", async () => {
-    const response = await request(createTestApp()).post("/api/participations");
+    const response = await request(createTestApp()).post("/api/check-ins");
 
     expect(response.status).toBe(201);
     expect(response.body).not.toHaveProperty("sessionId");
@@ -102,9 +102,9 @@ describe("check-in API", () => {
 
   it("accepts a valid Bearer heartbeat", async () => {
     const app = createTestApp({ instanceId: "task-a" });
-    const checkIn = await request(app).post("/api/participations");
+    const checkIn = await request(app).post("/api/check-ins");
     const heartbeat = await request(app)
-      .post("/api/participations/heartbeat")
+      .post("/api/check-ins/heartbeat")
       .set("Authorization", bearer(String(checkIn.body.sessionToken)));
 
     expect(heartbeat.status).toBe(200);
