@@ -85,21 +85,21 @@ h1 {
   cursor: pointer;
   background:
     radial-gradient(
-        circle at 64% 30%,
-        rgb(255 255 255 / 84%) 0 3%,
-        rgb(255 170 160 / 42%) 8%,
-        rgb(244 48 39 / 0%) 24%
-      )
-      padding-box,
+      circle at 64% 30%,
+      rgb(255 255 255 / 84%) 0 3%,
+      rgb(255 170 160 / 42%) 8%,
+      rgb(244 48 39 / 0%) 24%
+    )
+    padding-box,
     radial-gradient(
-        circle at 50% 58%,
-        #ff6258 0,
-        var(--color-signal-red) 42%,
-        var(--color-signal-red-dark) 100%
-      )
-      padding-box,
+      circle at 50% 58%,
+      #ff6258 0,
+      var(--color-signal-red) 42%,
+      var(--color-signal-red-dark) 100%
+    )
+    padding-box,
     linear-gradient(135deg, #ffffff 0%, #929292 36%, #f6f6f6 53%, #717171 100%)
-      border-box;
+    border-box;
   background-clip: padding-box, padding-box, border-box;
   box-shadow:
     0 16px 0 #5b5b5b,
@@ -169,6 +169,56 @@ h1 {
 
 .status-error {
   color: var(--color-error);
+}
+
+.demo-load-control {
+  display: grid;
+  width: min(100%, 400px);
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.demo-load-button,
+.demo-load-stop-button {
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  color: var(--color-ink);
+  cursor: pointer;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.demo-load-button:hover:not(:disabled) {
+  border-color: var(--color-signal-red);
+  color: var(--color-signal-red-dark);
+}
+
+.demo-load-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.demo-load-control p {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.demo-load-stop-button {
+  grid-column: 1 / -1;
+  color: var(--color-error);
+}
+
+.demo-load-button:focus-visible,
+.demo-load-stop-button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
 }
 
 @keyframes status-reveal {

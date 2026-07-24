@@ -1,17 +1,31 @@
 import type { CheckInResponse } from "@live-check-in-demo/shared";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createCheckIn, sendHeartbeat } from "./api-client";
 import { CheckInApp } from "./CheckInApp";
+import { clearStoredSession } from "./check-in-storage";
+import { createObservationSignalClient } from "./observation-signal-client";
 
 vi.mock("./api-client", () => ({
   createCheckIn: vi.fn(),
   sendHeartbeat: vi.fn(),
 }));
+vi.mock("./observation-signal-client", () => ({
+  createObservationSignalClient: vi.fn(),
+}));
 
 const mockedCreateCheckIn = vi.mocked(createCheckIn);
 const mockedSendHeartbeat = vi.mocked(sendHeartbeat);
+const mockedCreateObservationSignalClient = vi.mocked(
+  createObservationSignalClient,
+);
+const recordSuccessfulRequest = vi.fn(async () => true);
+const disposeObservationSignal = vi.fn();
+const originalStorageDescriptor = Object.getOwnPropertyDescriptor(
+  window,
+  "localStorage",
+);
 
 function session(
   expiresAt = new Date(Date.now() + 60_000).toISOString(),
@@ -23,9 +37,26 @@ function session(
   };
 }
 
+function enablePresenterDemoLoad(): void {
+  window.history.replaceState(null, "", "/?sketchcatch_demo_load=presenter");
+}
+
+beforeEach(() => {
+  mockedCreateObservationSignalClient.mockReturnValue({
+    dispose: disposeObservationSignal,
+    recordSuccessfulRequest,
+  });
+});
+
 afterEach(() => {
+  window.history.replaceState(null, "", "/");
+  if (originalStorageDescriptor !== undefined) {
+    Object.defineProperty(window, "localStorage", originalStorageDescriptor);
+  }
+  clearStoredSession();
   window.localStorage.clear();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -34,12 +65,162 @@ describe("CheckInApp", () => {
     render(<CheckInApp />);
 
     expect(
-      screen.getByRole("heading", { name: "데모에 참여해 주세요." }),
+      screen.getByRole("heading", { name: "시연에 참여해 주세요!!!" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("별도의 개인정보는 저장하지 않습니다."),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "참여하기" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", {
+        name: "AI \uacbd\uace0 \ub370\ubaa8 \u00b7 24\uac74",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("runs a bounded 24-request demo load through real check-ins and observation receipts", async () => {
+    vi.useFakeTimers();
+    enablePresenterDemoLoad();
+    mockedCreateCheckIn.mockResolvedValue(session());
+    render(<CheckInApp />);
+
+    expect(
+      screen.getByRole("button", {
+        name: "AI \uacbd\uace0 \ub370\ubaa8 \u00b7 24\uac74",
+      }),
+    ).toBeEnabled();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "AI \uacbd\uace0 \ub370\ubaa8 \u00b7 24\uac74",
+        }),
+      );
+      await vi.runAllTimersAsync();
+    });
+
+    expect(mockedCreateCheckIn).toHaveBeenCalledTimes(24);
+    expect(recordSuccessfulRequest).toHaveBeenCalledTimes(24);
+    expect(
+      screen.getByText(
+        "\uad00\uce21 \uc2e0\ud638 24\uac74 \uc804\uc1a1 \uc644\ub8cc",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "AI \uacbd\uace0 \ub370\ubaa8 \u00b7 24\uac74",
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", {
+        name: "Fargate \ud655\uc7a5 \uac80\uc99d \u00b7 \ucd5c\ub300 5 RPS \u00b7 900\uac74",
+      }),
+    ).toBeEnabled();
+  });
+
+  it("asks for confirmation before starting the 900-request scale-out load", () => {
+    enablePresenterDemoLoad();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<CheckInApp />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Fargate \ud655\uc7a5 \uac80\uc99d \u00b7 \ucd5c\ub300 5 RPS \u00b7 900\uac74",
+      }),
+    );
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(mockedCreateCheckIn).not.toHaveBeenCalled();
+  });
+
+  it("does not claim completion when every demo request fails", async () => {
+    vi.useFakeTimers();
+    mockedCreateCheckIn.mockRejectedValue(new Error("upstream unavailable"));
+    enablePresenterDemoLoad();
+    render(<CheckInApp />);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "AI \uacbd\uace0 \ub370\ubaa8 \u00b7 24\uac74",
+        }),
+      );
+      await vi.runAllTimersAsync();
+    });
+
+    expect(mockedCreateCheckIn).toHaveBeenCalledTimes(24);
+    expect(recordSuccessfulRequest).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "\uad00\uce21 \uc5f0\uacb0\uc744 \ud655\uc778\ud574 \uc8fc\uc138\uc694.",
+    );
+    expect(
+      screen.queryByText(
+        "\uad00\uce21 \uc2e0\ud638 0\uac74 \uc804\uc1a1 \uc644\ub8cc",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it("records successful check-in and heartbeat traffic for live observation", async () => {
+    mockedCreateCheckIn.mockResolvedValue(session());
+    mockedSendHeartbeat.mockResolvedValue({
+      ok: true,
+      receivedAt: new Date().toISOString(),
+      servedBy: "task-a",
+    });
+    render(<CheckInApp />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "참여하기" }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockedCreateCheckIn).toHaveBeenCalledTimes(1);
+    expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
+    expect(recordSuccessfulRequest).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a successful check-in active when browser storage rejects the session", async () => {
+    const entries = new Map<string, string>();
+    const blockedStorage: Storage = {
+      get length(): number {
+        return entries.size;
+      },
+      clear(): void {
+        entries.clear();
+      },
+      getItem(key: string): string | null {
+        return entries.get(key) ?? null;
+      },
+      key(index: number): string | null {
+        return Array.from(entries.keys())[index] ?? null;
+      },
+      removeItem(key: string): void {
+        entries.delete(key);
+      },
+      setItem(): void {
+        throw new DOMException("Storage quota exceeded", "QuotaExceededError");
+      },
+    };
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: blockedStorage,
+    });
+    mockedCreateCheckIn.mockResolvedValue(session());
+    mockedSendHeartbeat.mockImplementation(() => new Promise(() => undefined));
+    render(<CheckInApp />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "참여하기" }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByText("✓ 참여 중 · 연결됨")).toBeInTheDocument();
+    expect(mockedSendHeartbeat).toHaveBeenCalledTimes(1);
   });
 
   it("offers an explicit repeat action after check-in starts", async () => {
@@ -162,7 +343,7 @@ describe("CheckInApp", () => {
 
     expect(
       screen
-        .getByRole("heading", { name: "데모에 참여해 주세요." })
+        .getByRole("heading", { name: "시연에 참여해 주세요!!!" })
         .closest("section"),
     ).toHaveAttribute("data-served-by", "task-b");
   });

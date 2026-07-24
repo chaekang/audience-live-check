@@ -8,7 +8,22 @@ import ky from "ky";
 import { createLiveObservationReceiptReporter } from "./live-observation-receipt";
 
 const configuredBaseUrl = import.meta.env["VITE_API_BASE_URL"];
-const apiBaseUrl = configuredBaseUrl ?? "http://localhost:8080";
+const apiBaseUrl = resolveApiBaseUrl(configuredBaseUrl, import.meta.env.PROD);
+
+export function resolveApiBaseUrl(
+  configuredValue: string | undefined,
+  isProduction = false,
+): string {
+  const value =
+    configuredValue?.trim() || (isProduction ? "/" : "http://localhost:8080");
+  if (!value.startsWith("/")) {
+    return value;
+  }
+  if (typeof location === "undefined") {
+    throw new Error("A relative API base URL requires a browser origin.");
+  }
+  return new URL(value, location.origin).toString();
+}
 
 export type ApiClient = {
   readonly createCheckIn: (signal: AbortSignal) => Promise<CheckInResponse>;

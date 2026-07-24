@@ -75,6 +75,10 @@ export function createApp(options: AppOptions = {}): Express {
     response.json(heartbeat);
   });
 
+  app.post("/api/traffic", (_request, response) => {
+    response.status(204).send();
+  });
+
   app.use((_request, response) => {
     response
       .status(404)
